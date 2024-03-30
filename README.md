@@ -44,7 +44,7 @@ func main() {
 			Content: "This is a user message.",
 		}},
 	},
-	fmt.Printf("Req tokens: %d\n", req, tc.CountTokens(req))
+	fmt.Printf("Req tokens: %d\n", req, tc.CountRequestTokens(req))
 
 	// Count tokens in a ChatCompletionMessage.
 	msg := openai.ChatCompletionMessage{
@@ -58,7 +58,7 @@ func main() {
 			},
 		}},
 	}
-	fmt.Printf("Msg tokens: %d\n", msg, tc.CountTokens(msg))
+	fmt.Printf("Msg tokens: %d\n", msg, tc.CountMessageTokens(msg))
 
 	// Count tool tokens on their own.
 	tools := []openai.Tool{{
@@ -86,7 +86,7 @@ func main() {
 			},
 		},
 	}},
-	fmt.Printf("Tools tokens: %d\n", tools, tc.CountTokens(tools))
+	fmt.Printf("Tools tokens: %d\n", tools, tc.CountToolTokens(tools))
 
 }
 ```
