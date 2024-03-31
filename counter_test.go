@@ -26,62 +26,62 @@ var tests = []struct {
 	// wantCached allows us to notice when the model itself has changed.
 	wantCached int
 }{{
-	name: "Single system message",
-	in: openai.ChatCompletionRequest{
-		Messages: []openai.ChatCompletionMessage{{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: "This is a system message.",
-		}},
-	},
-	wantCached: 13,
-}, {
-	name: "System message and user message",
-	in: openai.ChatCompletionRequest{
-		Messages: []openai.ChatCompletionMessage{{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: "This is a system message.",
-		}, {
-			Role:    openai.ChatMessageRoleUser,
-			Content: "This is a user message.",
-		}},
-	},
-	wantCached: 23,
-}, {
-	name: "Assistant message no tools",
-	in: openai.ChatCompletionRequest{
-		Messages: []openai.ChatCompletionMessage{{
-			Role:    openai.ChatMessageRoleAssistant,
-			Content: "This is an assistant message.",
-		}},
-	},
-	wantCached: 13,
-}, {
-	name: "User message with name",
-	in: openai.ChatCompletionRequest{
-		Messages: []openai.ChatCompletionMessage{{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: "This is a system message.",
-		}, {
-			Role:    openai.ChatMessageRoleUser,
-			Content: "This is a user message.",
-			Name:    "Chris",
-		}},
-	},
-	wantCached: 25,
-}, {
-	name: "User message without name",
-	in: openai.ChatCompletionRequest{
-		Messages: []openai.ChatCompletionMessage{{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: "This is a system message.",
-		}, {
-			Role:    openai.ChatMessageRoleUser,
-			Content: "This is a user message.",
-		}},
-	},
-	wantCached: 23,
-}, {
-	name: "User message with tools",
+		name: "Single system message",
+		in: openai.ChatCompletionRequest{
+			Messages: []openai.ChatCompletionMessage{{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "This is a system message.",
+			}},
+		},
+		wantCached: 13,
+	}, {
+		name: "System message and user message",
+		in: openai.ChatCompletionRequest{
+			Messages: []openai.ChatCompletionMessage{{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "This is a system message.",
+			}, {
+				Role:    openai.ChatMessageRoleUser,
+				Content: "This is a user message.",
+			}},
+		},
+		wantCached: 23,
+	}, {
+		name: "Assistant message no tools",
+		in: openai.ChatCompletionRequest{
+			Messages: []openai.ChatCompletionMessage{{
+				Role:    openai.ChatMessageRoleAssistant,
+				Content: "This is an assistant message.",
+			}},
+		},
+		wantCached: 13,
+	}, {
+		name: "User message with name",
+		in: openai.ChatCompletionRequest{
+			Messages: []openai.ChatCompletionMessage{{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "This is a system message.",
+			}, {
+				Role:    openai.ChatMessageRoleUser,
+				Content: "This is a user message.",
+				Name:    "Chris",
+			}},
+		},
+		wantCached: 25,
+	}, {
+		name: "User message without name",
+		in: openai.ChatCompletionRequest{
+			Messages: []openai.ChatCompletionMessage{{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "This is a system message.",
+			}, {
+				Role:    openai.ChatMessageRoleUser,
+				Content: "This is a user message.",
+			}},
+		},
+		wantCached: 23,
+	}, {
+	name: "User message with one tool",
 	in: openai.ChatCompletionRequest{
 		Messages: []openai.ChatCompletionMessage{{
 			Role:    openai.ChatMessageRoleUser,
@@ -101,7 +101,7 @@ var tests = []struct {
 						},
 						"unit": {
 							Type: jsonschema.String,
-							Enum: []string{"celcius", "fahrenheit"},
+							Enum: []string{"celsius", "fahrenheit"},
 						},
 					},
 					Required: []string{"location"},
@@ -109,9 +109,9 @@ var tests = []struct {
 			},
 		}},
 	},
-	wantCached: 85,
+	wantCached: 84,
 }, {
-	name: "System message with tools",
+	name: "System and user message with one tool",
 	in: openai.ChatCompletionRequest{
 		Messages: []openai.ChatCompletionMessage{{
 			Role:    openai.ChatMessageRoleSystem,
@@ -236,7 +236,8 @@ var tests = []struct {
 			Role:    openai.ChatMessageRoleUser,
 			Content: "I want to ski at Breckenridge this weekend.",
 		}, {
-			Role: openai.ChatMessageRoleAssistant,
+			Role:    openai.ChatMessageRoleAssistant,
+			Content: "I can help with that.",
 			ToolCalls: []openai.ToolCall{{
 				ID:   "testcall_20240327",
 				Type: openai.ToolTypeFunction,
@@ -251,7 +252,7 @@ var tests = []struct {
 			ToolCallID: "testcall_20240327",
 		}},
 	},
-	wantCached: 60,
+	wantCached: 70,
 }, {
 	name: "Assistant message with tool call then 1 tool content property",
 	in: openai.ChatCompletionRequest{
@@ -276,7 +277,7 @@ var tests = []struct {
 	},
 	wantCached: 50,
 }, {
-	name: "Assistant message (Park City) with tool call then 2 tool content properties",
+	name: "Assistant message with tool call then 2 tool content properties",
 	in: openai.ChatCompletionRequest{
 		Messages: []openai.ChatCompletionMessage{{
 			Role:    openai.ChatMessageRoleUser,
@@ -519,7 +520,7 @@ func TestCountRequestTokens(t *testing.T) {
 	for _, tt := range tests {
 		req := tt.in
 		req.Model = openai.GPT4TurboPreview
-		req.MaxTokens = 12
+		req.MaxTokens = 150
 		req.Temperature = 0.0
 
 		resp, err := client.CreateChatCompletion(context.Background(), req)
@@ -527,27 +528,44 @@ func TestCountRequestTokens(t *testing.T) {
 			t.Fatalf("%s: CreateChatCompletion: %v", tt.name, err)
 		}
 
-		got := counter.CountRequestTokens(tt.in)
-		want := resp.Usage.PromptTokens
+		gotPromptTokens := counter.CountRequestTokens(tt.in)
+		wantPromptTokens := resp.Usage.PromptTokens
 
-		if got != want {
+		if gotPromptTokens != wantPromptTokens {
 			t.Errorf(
 				"%s: token count got %d, want %d, diff %d",
 				tt.name,
-				got,
-				want,
-				got-want,
+				gotPromptTokens,
+				wantPromptTokens,
+				gotPromptTokens-wantPromptTokens,
 			)
 		}
 
-		if got != tt.wantCached {
+		if wantPromptTokens != tt.wantCached {
 			t.Errorf(
 				"%s: cached token count got %d, want %d, diff %d",
 				tt.name,
-				got,
 				tt.wantCached,
-				got-tt.wantCached,
+				wantPromptTokens,
+				tt.wantCached-wantPromptTokens,
 			)
 		}
+
+		gotCompletionTokens := counter.CountRespTokens(resp)
+		wantCompletionTokens := resp.Usage.CompletionTokens
+
+		respJSON, _ := json.Marshal(resp)
+
+		if gotCompletionTokens != wantCompletionTokens {
+			t.Errorf(
+				"%s: completion token count got %d, want %d, diff %d\n%s",
+				tt.name,
+				gotCompletionTokens,
+				wantCompletionTokens,
+				gotCompletionTokens-wantCompletionTokens,
+				string(respJSON),
+			)
+		}
+
 	}
 }

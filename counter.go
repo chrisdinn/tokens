@@ -32,6 +32,13 @@ func (c *Counter) CountTokens(txt string) int {
 	return len(tokens)
 }
 
+var (
+	tokensPerReqMessage     = 3
+	tokensPerToolCall    = 4
+	tokensPerName        = 1
+	tokensForMultiTool   = 13
+)
+
 // CountRequestTokens returns the number of tokens in a chat completion request.
 func (c *Counter) CountRequestTokens(
 	req openai.ChatCompletionRequest,
@@ -71,6 +78,7 @@ func (c *Counter) CountRequestTokens(
 	}
 
 	for _, message := range req.Messages {
+		count += tokensPerReqMessage
 		count += c.CountMessageTokens(message)
 	}
 
@@ -89,13 +97,32 @@ func (c *Counter) CountRequestTokens(
 	return count
 }
 
-var (
-	tokensPerMessage     = 3
-	tokensPerToolMessage = 3
-	tokensPerToolCall    = 4
-	tokensPerName        = 1
-	tokensForMultiTool   = 13
-)
+func (c *Counter) CountRespTokens(
+	resp openai.ChatCompletionResponse,
+) int {
+	var (
+		count int
+	)
+
+	for _, choice := range resp.Choices {
+		count += c.CountMessageTokens(choice.Message)
+
+		// Don't count the role.
+		count -= c.CountTokens(choice.Message.Role)
+
+		// Tool calls bump completion token count down by 1.
+		if len(choice.Message.ToolCalls) > 0 {
+			count -= 1
+		}
+
+		// Remove 3 when both content and tools are present.
+		if len(choice.Message.ToolCalls) > 0 && choice.Message.Content != "" {
+			count -= 3
+		}
+	}
+
+	return count
+}
 
 // CountMessageTokens returns the number of tokens in a single message,
 // regardless of it's role/type. This is especially useful for counting the
@@ -135,14 +162,13 @@ func (c *Counter) CountMessageTokens(
 		}
 	}
 
-	if message.Name != "" {
-		count += c.CountTokens(message.Name) + tokensPerName
+	// Add 4 when both content and tools are present.
+	if len(message.ToolCalls) > 0 && message.Content != "" {
+		count += 4
 	}
 
-	if message.Role == openai.ChatMessageRoleTool {
-		count += tokensPerToolMessage
-	} else {
-		count += tokensPerMessage
+	if message.Name != "" {
+		count += c.CountTokens(message.Name) + tokensPerName
 	}
 
 	return count

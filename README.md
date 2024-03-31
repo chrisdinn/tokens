@@ -15,6 +15,23 @@ to Create ChatCompletion endpoint as the usage parameter. However, they do not
 provide those totals for streaming calls to the same endpoint. To count tokens
 for a streaming request, at least for now, you need to do it yourself.
 
+## How does it work?
+
+This package uses [tiktoken-go](https://github.com/pkoukk/tiktoken-go) for
+tokenization. To count tokens accurately you need to recreated the strategy
+used but not documented by OpenAI. Accuracy is derived from a few key insights:
+
+- Tools are rendered as typescript functions with a very specific format.
+- Tool call arguments are rendered in typescript args format (no quotes around
+argument keys).
+- Tool messages are rendered as stringified, indented JSON (yes quotes around
+argument keys).
+- Role isn't counted for completion messages.
+
+There are still open questions:
+
+- Why does more than one tool message add 13 unaccounted for tokens?
+
 ## Usage
 
 ```go
