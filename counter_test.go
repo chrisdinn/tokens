@@ -26,61 +26,61 @@ var tests = []struct {
 	// wantCached allows us to notice when the model itself has changed.
 	wantCached int
 }{{
-		name: "Single system message",
-		in: openai.ChatCompletionRequest{
-			Messages: []openai.ChatCompletionMessage{{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: "This is a system message.",
-			}},
-		},
-		wantCached: 13,
-	}, {
-		name: "System message and user message",
-		in: openai.ChatCompletionRequest{
-			Messages: []openai.ChatCompletionMessage{{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: "This is a system message.",
-			}, {
-				Role:    openai.ChatMessageRoleUser,
-				Content: "This is a user message.",
-			}},
-		},
-		wantCached: 23,
-	}, {
-		name: "Assistant message no tools",
-		in: openai.ChatCompletionRequest{
-			Messages: []openai.ChatCompletionMessage{{
-				Role:    openai.ChatMessageRoleAssistant,
-				Content: "This is an assistant message.",
-			}},
-		},
-		wantCached: 13,
-	}, {
-		name: "User message with name",
-		in: openai.ChatCompletionRequest{
-			Messages: []openai.ChatCompletionMessage{{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: "This is a system message.",
-			}, {
-				Role:    openai.ChatMessageRoleUser,
-				Content: "This is a user message.",
-				Name:    "Chris",
-			}},
-		},
-		wantCached: 25,
-	}, {
-		name: "User message without name",
-		in: openai.ChatCompletionRequest{
-			Messages: []openai.ChatCompletionMessage{{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: "This is a system message.",
-			}, {
-				Role:    openai.ChatMessageRoleUser,
-				Content: "This is a user message.",
-			}},
-		},
-		wantCached: 23,
-	}, {
+	name: "Single system message",
+	in: openai.ChatCompletionRequest{
+		Messages: []openai.ChatCompletionMessage{{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: "This is a system message.",
+		}},
+	},
+	wantCached: 13,
+}, {
+	name: "System message and user message",
+	in: openai.ChatCompletionRequest{
+		Messages: []openai.ChatCompletionMessage{{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: "This is a system message.",
+		}, {
+			Role:    openai.ChatMessageRoleUser,
+			Content: "This is a user message.",
+		}},
+	},
+	wantCached: 23,
+}, {
+	name: "Assistant message no tools",
+	in: openai.ChatCompletionRequest{
+		Messages: []openai.ChatCompletionMessage{{
+			Role:    openai.ChatMessageRoleAssistant,
+			Content: "This is an assistant message.",
+		}},
+	},
+	wantCached: 13,
+}, {
+	name: "User message with name",
+	in: openai.ChatCompletionRequest{
+		Messages: []openai.ChatCompletionMessage{{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: "This is a system message.",
+		}, {
+			Role:    openai.ChatMessageRoleUser,
+			Content: "This is a user message.",
+			Name:    "Chris",
+		}},
+	},
+	wantCached: 25,
+}, {
+	name: "User message without name",
+	in: openai.ChatCompletionRequest{
+		Messages: []openai.ChatCompletionMessage{{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: "This is a system message.",
+		}, {
+			Role:    openai.ChatMessageRoleUser,
+			Content: "This is a user message.",
+		}},
+	},
+	wantCached: 23,
+}, {
 	name: "User message with one tool",
 	in: openai.ChatCompletionRequest{
 		Messages: []openai.ChatCompletionMessage{{
@@ -551,7 +551,7 @@ func TestCountRequestTokens(t *testing.T) {
 			)
 		}
 
-		gotCompletionTokens := counter.CountRespTokens(resp)
+		gotCompletionTokens := counter.CountResponseTokens(resp)
 		wantCompletionTokens := resp.Usage.CompletionTokens
 
 		respJSON, _ := json.Marshal(resp)

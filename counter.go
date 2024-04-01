@@ -33,10 +33,10 @@ func (c *Counter) CountTokens(txt string) int {
 }
 
 var (
-	tokensPerReqMessage     = 3
-	tokensPerToolCall    = 4
-	tokensPerName        = 1
-	tokensForMultiTool   = 13
+	tokensPerReqMessage = 3
+	tokensPerToolCall   = 4
+	tokensPerName       = 1
+	tokensForMultiTool  = 13
 )
 
 // CountRequestTokens returns the number of tokens in a chat completion request.
@@ -97,7 +97,8 @@ func (c *Counter) CountRequestTokens(
 	return count
 }
 
-func (c *Counter) CountRespTokens(
+// CountResponseTokens returns the number of tokens in a chat completion response.
+func (c *Counter) CountResponseTokens(
 	resp openai.ChatCompletionResponse,
 ) int {
 	var (
