@@ -34,7 +34,6 @@ func (c *Counter) CountTokens(txt string) int {
 
 var (
 	tokensPerReqMessage = 3
-	tokensPerToolCall   = 4
 	tokensPerName       = 1
 	tokensForMultiTool  = 13
 )
@@ -79,7 +78,8 @@ func (c *Counter) CountRequestTokens(
 
 	for _, message := range req.Messages {
 		count += tokensPerReqMessage
-		count += c.CountMessageTokens(message)
+		got := c.CountMessageTokens(message)
+		count += got
 	}
 
 	// Requests with 2 or more tool messages have a different token count. The
@@ -94,7 +94,23 @@ func (c *Counter) CountRequestTokens(
 		count += tokensForMultiTool
 	}
 
+	if req.ToolChoice != nil {
+		count += c.countToolChoice(req.ToolChoice)
+	}
+
 	return count
+}
+
+func (c *Counter) countToolChoice(toolChoice any) int {
+	switch t := toolChoice.(type) {
+	case openai.ToolChoice:
+		tcString := `{
+ "name": "` + t.Function.Name + `"
+}`
+		return c.CountTokens(tcString)
+	default:
+		return 0
+	}
 }
 
 // CountResponseTokens returns the number of tokens in a chat completion response.
@@ -110,16 +126,6 @@ func (c *Counter) CountResponseTokens(
 
 		// Don't count the role.
 		count -= c.CountTokens(choice.Message.Role)
-
-		// Tool calls bump completion token count down by 1.
-		if len(choice.Message.ToolCalls) > 0 {
-			count -= 1
-		}
-
-		// Remove 3 when both content and tools are present.
-		if len(choice.Message.ToolCalls) > 0 && choice.Message.Content != "" {
-			count -= 3
-		}
 	}
 
 	return count
@@ -136,36 +142,29 @@ func (c *Counter) CountMessageTokens(
 	)
 
 	count += c.CountTokens(message.Role)
+
 	if message.Role == openai.ChatMessageRoleTool {
 		// Tool content, if it's JSON, is needs to be reformatted into the same
 		// JSON style as tool call arguments.
 		var contentJSON map[string]interface{}
 		if err := json.Unmarshal([]byte(message.Content), &contentJSON); err != nil {
-			count += c.CountTokens(message.Content)
+			count += c.CountTokens(fmt.Sprintf("%q: %q", "text", message.Content))
 		} else {
 			stringified, _ := stringifyObject(contentJSON, true)
+
 			count += c.CountTokens(stringified)
 		}
+
 	} else {
 		count += c.CountTokens(message.Content)
 	}
 
 	for _, tc := range message.ToolCalls {
-		count += tokensPerToolCall
-		count += c.CountTokens(string(tc.Type))
-		if tc.Type == openai.ToolTypeFunction {
-			count += c.CountTokens(tc.Function.Name) * 2
-			args, err := formatArguments(tc.Function.Arguments)
-			if err != nil {
-				continue
-			}
-			count += c.CountTokens(args)
-		}
-	}
-
-	// Add 4 when both content and tools are present.
-	if len(message.ToolCalls) > 0 && message.Content != "" {
-		count += 4
+		count += c.CountTokens(fmt.Sprintf(
+			"\"name\":%q, \"arguments\":%q",
+			tc.Function.Name,
+			tc.Function.Arguments,
+		))
 	}
 
 	if message.Name != "" {
@@ -331,50 +330,55 @@ func formatArguments(arguments string) (string, error) {
 	return stringifyObject(jsonObject, false)
 }
 
+// stringifyObject returns a JSON-formatted string representation of the object.
+func stringifyObject(jsonObject map[string]interface{}, useQuotes bool) (string, error) {
+	if len(jsonObject) == 0 {
+		return "{}", nil
+	}
+
+	var properties []string
+	for fieldName, value := range jsonObject {
+		properties = append(properties, formatField(fieldName, value, useQuotes))
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(properties, ",")), nil
+}
+
 func formatField(fieldName string, value interface{}, useQuotes bool) string {
-	formattedValue, _ := formatValue(value)
+	formattedValue, _ := formatValue(value, useQuotes)
 	if useQuotes {
-		return fmt.Sprintf("\"%s\": %s", fieldName, formattedValue)
+		return fmt.Sprintf("%q:%s", fieldName, formattedValue)
 	}
 	return fmt.Sprintf("%s:%s", fieldName, formattedValue)
 }
 
-// stringifyObject returns a JSON-formatted string representation of the object.
-func stringifyObject(jsonObject map[string]interface{}, useQuotes bool) (string, error) {
-	if len(jsonObject) == 1 {
-		for fieldName, value := range jsonObject {
-			return fmt.Sprintf("{%s}\n", formatField(fieldName, value, useQuotes)), nil
-		}
-	}
-
-	//lines := []string{"{"}
-	var lines []string
-	properties := []string{}
-	for fieldName, value := range jsonObject {
-		properties = append(properties, formatField(fieldName, value, useQuotes))
-	}
-	if len(properties) > 0 {
-		lines = append(lines, strings.Join(properties, ", "))
-	}
-	return fmt.Sprintf("{%s}\n", strings.Join(lines, "\n")), nil
-}
-
 // formatValue returns a JSON-formatted string representation of the value.
-func formatValue(value interface{}) (string, error) {
+func formatValue(value interface{}, useQuotes bool) (string, error) {
 	switch v := value.(type) {
-	case string, float64, float32, int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8:
-		return fmt.Sprintf("\"%v\"", v), nil
+	case string:
+		return fmt.Sprintf("%q", v), nil
+	case float64, float32, int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8, bool:
+		return fmt.Sprintf("%v", v), nil
 	case []interface{}:
-		elements := []string{}
-		for _, element := range v {
-			switch e := element.(type) {
-			case string, float64, float32, int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8:
-				elements = append(elements, fmt.Sprintf("\"%v\"", e))
-			default:
-				elements = append(elements, "\"\"")
+		elements := make([]string, len(v))
+		for i, element := range v {
+			formattedElement, err := formatValue(element, useQuotes)
+			if err != nil {
+				return "", err
 			}
+			elements[i] = formattedElement
 		}
 		return "[" + strings.Join(elements, ",") + "]", nil
+	case map[string]interface{}:
+		return stringifyObject(v, useQuotes)
+	case nil:
+		return "null", nil
+	default:
+		// For complex types, use json.Marshal as a fallback
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(jsonBytes), nil
 	}
-	return "\"\"", nil // Default case for other types or null
 }
